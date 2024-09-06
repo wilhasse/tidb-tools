@@ -98,6 +98,12 @@ func GetTableInfoWithVersion(ctx context.Context, db QueryExecutor, schemaName s
 		return nil, errors.Trace(err)
 	}
 
+	// Extract only the column definitions
+	createTableSQL, err = ExtractColumnDefinitions(createTableSQL)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+
 	if version != nil && version.Major <= 4 {
 		var replaceString string
 		if isPKISHandle(ctx, db, schemaName, tableName) {
@@ -120,6 +126,28 @@ func GetTableInfoWithVersion(ctx context.Context, db QueryExecutor, schemaName s
 	sctx.GetSessionVars().SQLMode = mysql.DelSQLMode(sctx.GetSessionVars().SQLMode, mysql.ModeStrictTransTables)
 	sctx.GetSessionVars().SQLMode = mysql.DelSQLMode(sctx.GetSessionVars().SQLMode, mysql.ModeStrictAllTables)
 	return GetTableInfoBySQLWithSessionContext(sctx, createTableSQL, parser2)
+}
+
+func ExtractColumnDefinitions(createTableSQL string) (string, error) {
+	// Find the start of the column definitions
+	startIndex := strings.Index(createTableSQL, "(")
+	if startIndex == -1 {
+		return "", errors.New("unable to find start of column definitions")
+	}
+
+	// Find the "ENGINE" keyword
+	engineIndex := strings.Index(createTableSQL, "ENGINE=")
+	if engineIndex == -1 {
+		return "", errors.New("unable to find ENGINE keyword")
+	}
+
+	// Extract the text between the opening parenthesis and "ENGINE"
+	columnDefs := strings.TrimSpace(createTableSQL[startIndex+1 : engineIndex-1])
+
+	// Reconstruct the CREATE TABLE statement with only the column definitions
+	result := "CREATE TABLE `VERSAO` (\n  " + columnDefs
+
+	return result, nil
 }
 
 // GetTableInfo returns table information.

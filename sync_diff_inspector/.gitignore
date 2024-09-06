@@ -1,0 +1,4 @@
+.vscode
+__debug_*
+config_dif.toml
+output

@@ -730,18 +730,31 @@ func GetSessionVariable(ctx context.Context, db QueryExecutor, variable string) 
 		+---------------+-------+
 	*/
 
-	for rows.Next() {
-		err = rows.Scan(&variable, &value)
-		if err != nil {
-			return "", errors.Trace(err)
-		}
-	}
-
-	if rows.Err() != nil {
+	columns, err := rows.Columns()
+	if err != nil {
 		return "", errors.Trace(err)
 	}
 
-	return value, nil
+	values := make([]interface{}, len(columns))
+	for i := range values {
+		values[i] = new(sql.RawBytes)
+	}
+
+	for rows.Next() {
+		err = rows.Scan(values...)
+		if err != nil {
+			return "", errors.Trace(err)
+		}
+
+		// We're only interested in the first two columns
+		if len(values) >= 2 {
+			variable = string(*values[0].(*sql.RawBytes))
+			value = string(*values[1].(*sql.RawBytes))
+			return value, nil
+		}
+	}
+
+	return "", fmt.Errorf("variable %s not found", variable)
 }
 
 // GetSQLMode returns sql_mode.
